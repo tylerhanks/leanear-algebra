@@ -1,10 +1,11 @@
 -- Leanear Algebra: Linear Algebra Done Right in Lean
 
-universe u v
+universe u u₁ u₂
 
 section chapter1
 
-class Field (F : Type u) where
+-- Definition of fields.
+class Field (F : Type u₁) where
   zero : F
   one : F
   add : F → F → F
@@ -23,7 +24,8 @@ class Field (F : Type u) where
 
 export Field (zero one add mult add_inv mult_inv)
 
-class VectorSpace (V : Type v) (F : Type u) [Field F] where
+-- Definition of vector spaces over a field F.
+structure VectorSpace (V : Type u₂) (F : Type u₁) [Field F] where
   add : V → V → V
   smult : F → V → V
   add_comm : ∀ u v : V, add u v = add v u
@@ -37,7 +39,57 @@ class VectorSpace (V : Type v) (F : Type u) [Field F] where
   smult_distrib : ∀ (a : F) (u v : V), smult a (add u v) = add (smult a u) (smult a v)
   add_distrib : ∀ (a b : F) (v : V), smult (Field.add a b) v = add (smult a v) (smult b v)
 
-instance (S : Type v) (F : Type u) [Field F] : VectorSpace (S → F) F where
+-- A vector space has a unique additive identity.
+theorem unique_add_id (F : Type u₁) [Field F] (V : Type u₂) (VS : VectorSpace V F) : 
+  ∀ zero' : V, (∀ v : V, ((VS.add v zero') = v)) → (zero' = VS.zero) := by
+  intro zero' h
+  have h1 : zero' = VS.add zero' VS.zero := by
+    rw [VS.add_id]
+  rw [VS.add_comm] at h1
+  rw [h1, h]
+
+-- Every element in a vector space has a unique additive inverse.
+theorem unique_add_inv (F : Type u₁) [Field F] (V : Type u₂) (VS : VectorSpace V F) :
+  ∀ v inv' : V, (VS.add v inv' = VS.zero) → (inv' = VS.add_inv v) := by
+  intro v w h
+  let w' := VS.add_inv v
+  --have h1 : VS.add v w' = VS.zero := by rw [VS.is_add_inv]
+  rw [VS.add_comm] at h
+  calc
+    w = VS.add w VS.zero := by rw [VS.add_id]
+    _ = VS.add w (VS.add v w') := by rw [VS.is_add_inv]
+    _ = VS.add (VS.add w v) w' := by rw [VS.add_assoc]
+    _ = VS.add VS.zero w' := by rw [h]
+    _ = VS.add w' VS.zero := by rw [VS.add_comm]
+    _ = w' := by rw [VS.add_id]
+
+-- 0v = 0.
+theorem zero_smult_v (F : Type u₁) [Field F] (V : Type u₂) (VS : VectorSpace V F) :
+  ∀ (x : F) (v : V), (x = Field.zero) → VS.smult x v = VS.zero := by
+  intro x v h
+  have h1 : (add zero x) = x := by rw [Field.add_id]
+  rw [h] at h1
+  have h2 : VS.smult zero v = VS.smult (add zero zero) v := by
+    simp
+    conv => lhs; rw [←h1]
+  rw [VS.add_distrib] at h2
+  -- h2 : 0v = 0v + 0v
+  let i := VS.add_inv (VS.smult zero v)
+  have h3 : VS.add (VS.smult zero v) i = VS.zero := by
+    rw [VS.is_add_inv]
+  have h4 : VS.smult zero v = VS.add (VS.smult zero v) VS.zero := by
+    rw [VS.add_id]
+  rw [←h3] at h4
+  rw [←VS.add_assoc] at h4
+  rw [←h2] at h4
+  rw [VS.is_add_inv] at h4
+  subst h
+  exact h4
+  -- Jesus Christ
+-- 0v = 0v + 0 = 0v + 0v - 0v = 0v - 0v = 0
+
+-- Funcions from a set S to a field F form a vector space over F.
+instance (S : Type u₂) (F : Type u₁) [Field F] : VectorSpace (S → F) F where
   add f g := fun x => Field.add (f x) (g x)
   smult c f := fun x => Field.mult c (f x)
   add_comm f g := by
@@ -75,15 +127,8 @@ instance (S : Type v) (F : Type u) [Field F] : VectorSpace (S → F) F where
     apply funext; intro x
     rw [Field.mult_comm, Field.distrib, Field.mult_comm]
     conv in (mult (f x) d) => rw [Field.mult_comm]
-    
 
-
-  
-
-    
-  
-
-#check funext
+-- Defining GF(2) to test my definition of a field.
 def xor (x y : Bool) := (x || y) && (¬ (x && y))
 theorem false_xor_x : ∀ x : Bool, xor false x = x := by
   intro x
@@ -91,6 +136,7 @@ theorem false_xor_x : ∀ x : Bool, xor false x = x := by
   case false => simp
   case true => simp
 
+-- XOR helper lemmas
 theorem true_and_x : ∀ x : Bool, (true && x) = x := by
   intro x
   induction x
@@ -101,6 +147,7 @@ theorem false_and_x : ∀ x : Bool, (false && x) = false := by
   intro x
   simp
 
+-- GF(2)
 instance : Field Bool where
   zero := false
   one := true
